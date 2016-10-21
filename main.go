@@ -89,7 +89,7 @@ func downloadAsync(baseurl string, resolution string, subdir string, outputPath 
 		panic(err)
 	}
 
-	wg.Add(concurrency)
+	wg.Add(1)
 
 	go pool(&wg, concurrency, tasks, outputPath)
 
@@ -100,11 +100,14 @@ func downloadAsync(baseurl string, resolution string, subdir string, outputPath 
 
 func pool(wg *sync.WaitGroup, workers int, tasks []downloadTask, outputPath string) {
 
+	defer wg.Done()
+
 	downloadTasksCh := make(chan downloadTask)
 	unzipTasksCh := make(chan string)
 
 	for i := 0; i < workers; i++ {
-		go downloadWorker(downloadTasksCh, unzipTasksCh)
+		wg.Add(2) // +1 for every worker running here
+		go downloadWorker(downloadTasksCh, unzipTasksCh, wg)
 		go unzipWorker(unzipTasksCh, wg, outputPath)
 	}
 
@@ -117,7 +120,9 @@ func pool(wg *sync.WaitGroup, workers int, tasks []downloadTask, outputPath stri
 	close(unzipTasksCh)
 }
 
-func downloadWorker(downloadTasksCh <-chan downloadTask, unzipTasksCh chan<- string) {
+func downloadWorker(downloadTasksCh <-chan downloadTask, unzipTasksCh chan<- string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	// defer wg.Done()
 	for {
 		task, ok := <-downloadTasksCh
@@ -125,9 +130,7 @@ func downloadWorker(downloadTasksCh <-chan downloadTask, unzipTasksCh chan<- str
 		if !ok {
 			return
 		}
-		// d := time.Duration(task) * time.Millisecond
-		// time.Sleep(100)
-		// fmt.Printf("Downloading: %s -> %s\n", task.uri, task.outputPath)
+
 		filepath, err := downloadHGT(task.uri, task.outputPath)
 
 		if err != nil {
