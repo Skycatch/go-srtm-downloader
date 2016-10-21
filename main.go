@@ -137,9 +137,7 @@ func downloadWorker(downloadTasksCh <-chan downloadTask, unzipTasksCh chan<- str
 		if !ok {
 			return
 		}
-		// d := time.Duration(task) * time.Millisecond
-		// time.Sleep(100)
-		// fmt.Printf("Downloading: %s -> %s\n", task.uri, task.outputPath)
+
 		filepath, err := downloadHGT(task.uri, task.outputPath)
 
 		if err != nil {
