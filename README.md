@@ -1,8 +1,6 @@
 # SRTM Downloader
 Library to assist in downloading SRTM data from https://dds.cr.usgs.gov/srtm/version2_1
 
-> Work in progress
-
 ## Usage
 
 Help
