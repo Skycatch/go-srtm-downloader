@@ -20,6 +20,7 @@ func main() {
 	var resolution string
 	var subdir string
 	var outputPath string
+	var concurrency int
 
 	app := cli.NewApp()
 
@@ -28,7 +29,7 @@ func main() {
 			Name:  "download",
 			Usage: "Download SRTM data",
 			Action: func(c *cli.Context) error {
-				downloadAsync(baseurl, resolution, subdir, outputPath)
+				downloadAsync(baseurl, resolution, subdir, outputPath, concurrency)
 				return nil
 			},
 			Flags: []cli.Flag{
@@ -54,13 +55,21 @@ func main() {
 		},
 	}
 
+	app.Flags = []cli.Flag{
+		cli.IntFlag{
+			Name:        "concurrency",
+			Value:       20,
+			Usage:       "Set download concurrency to avoid rate limiting",
+			Destination: &concurrency,
+		},
+	}
+
 	app.Run(os.Args)
 }
 
-func downloadAsync(baseurl string, resolution string, subdir string, outputPath string) error {
+func downloadAsync(baseurl string, resolution string, subdir string, outputPath string, concurrency int) error {
 	var wg sync.WaitGroup
 
-	concurrency := 20
 	list := getList(baseurl, resolution, subdir)
 	downloadTo := path.Join(outputPath, "_raw")
 
