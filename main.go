@@ -69,6 +69,8 @@ func main() {
 
 func downloadAsync(baseurl string, resolution string, subdir string, outputPath string, concurrency int) error {
 	var wg sync.WaitGroup
+	var downloadWg sync.WaitGroup
+	var unzipWg sync.WaitGroup
 
 	list := getList(baseurl, resolution, subdir)
 	downloadTo := path.Join(outputPath, "_raw")
@@ -91,24 +93,25 @@ func downloadAsync(baseurl string, resolution string, subdir string, outputPath 
 
 	wg.Add(1)
 
-	go pool(&wg, concurrency, tasks, outputPath)
+	go pool(&wg, &downloadWg, &unzipWg, concurrency, tasks, outputPath)
 
 	wg.Wait()
 
 	return nil
 }
 
-func pool(wg *sync.WaitGroup, workers int, tasks []downloadTask, outputPath string) {
+func pool(wg *sync.WaitGroup, downloadWg *sync.WaitGroup, unzipWg *sync.WaitGroup, workers int, tasks []downloadTask, outputPath string) {
 
 	defer wg.Done()
 
-	downloadTasksCh := make(chan downloadTask)
 	unzipTasksCh := make(chan string)
+	downloadTasksCh := make(chan downloadTask)
 
 	for i := 0; i < workers; i++ {
-		wg.Add(2) // +1 for every worker running here
-		go downloadWorker(downloadTasksCh, unzipTasksCh, wg)
-		go unzipWorker(unzipTasksCh, wg, outputPath)
+		downloadWg.Add(1)
+		unzipWg.Add(1)
+		go downloadWorker(downloadTasksCh, unzipTasksCh, downloadWg)
+		go unzipWorker(unzipTasksCh, unzipWg, outputPath)
 	}
 
 	for _, task := range tasks {
@@ -117,20 +120,26 @@ func pool(wg *sync.WaitGroup, workers int, tasks []downloadTask, outputPath stri
 
 	// indicates that no more jobs will be sent
 	close(downloadTasksCh)
+
+	downloadWg.Wait()
+
 	close(unzipTasksCh)
+
+	unzipWg.Wait()
 }
 
 func downloadWorker(downloadTasksCh <-chan downloadTask, unzipTasksCh chan<- string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	// defer wg.Done()
 	for {
 		task, ok := <-downloadTasksCh
 
 		if !ok {
 			return
 		}
-
+		// d := time.Duration(task) * time.Millisecond
+		// time.Sleep(100)
+		// fmt.Printf("Downloading: %s -> %s\n", task.uri, task.outputPath)
 		filepath, err := downloadHGT(task.uri, task.outputPath)
 
 		if err != nil {
